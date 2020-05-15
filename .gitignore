@@ -1,4 +1,4 @@
 /*.exe
 go.sum
 .idea
-/config.json
+/config/config.go

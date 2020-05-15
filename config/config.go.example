@@ -1,11 +1,18 @@
 package config
 
 import (
-	"encoding/json"
 	"golang.org/x/crypto/ssh"
-	"log"
 	"net"
-	"os"
+)
+
+package config
+
+import (
+"encoding/json"
+"golang.org/x/crypto/ssh"
+"log"
+"net"
+"os"
 )
 
 // 配置文件机构提
@@ -33,15 +40,11 @@ func init() {
 // 读取配置文件 加载全局参数
 func loadGlobalConfig() {
 	// 配置文件读取
-	file, err := os.Open("config.json")
-	if err != nil {
-		log.Fatalln("Cannot open config file", err)
-	}
-	decoder := json.NewDecoder(file)
-	GlobalConfig = &globalConfig{}
-	err = decoder.Decode(GlobalConfig)
-	if err != nil {
-		log.Fatalln("Cannot get configuration from file", err)
+	GlobalConfig = &globalConfig{
+		"root",
+		"root",
+		"localhost:1090",
+		"localhost:2080",
 	}
 }
 
