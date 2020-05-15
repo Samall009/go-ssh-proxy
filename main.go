@@ -2,7 +2,8 @@ package main
 
 // 从本地端口9000转发到远程端口9999
 import (
-	config2 "github/lucky/ssh_proxy/config"
+	"fmt"
+	. "github/lucky/ssh_proxy/config"
 	"golang.org/x/crypto/ssh"
 	"io"
 	"log"
@@ -17,7 +18,7 @@ var GableClient *ssh.Client
 // 入口方法
 func main() {
 	// 设置监听 监听本地端口数据
-	localListener, err := net.Listen("tcp", config2.LocalAddrString)
+	localListener, err := net.Listen("tcp", GlobalConfig.LocalAddrString)
 	if err != nil {
 		log.Fatalf("net.Listen failed: %v", err)
 	}
@@ -45,7 +46,7 @@ func sshClient() {
 	var err error
 
 	// 链接ssh
-	GableClient, err = ssh.Dial("tcp", config2.ServerAddrString, config2.Config)
+	GableClient, err = ssh.Dial("tcp", GlobalConfig.ServerAddrString, Config)
 
 	// 判断错误
 	if err != nil {
@@ -76,6 +77,9 @@ func task(localListener net.Listener) {
 
 // 获取代理链接
 func getHostPort(client net.Conn) string {
+	// 错误信息hook
+	defer errorHook()
+
 	var b [1024]byte
 	// 从链接中读取数据
 	n, err := client.Read(b[:])
@@ -119,6 +123,8 @@ func getHostPort(client net.Conn) string {
 func proxy(client net.Conn) {
 	// 兜底执行 关闭链接
 	defer client.Close()
+	// 错误信息hook
+	defer errorHook()
 
 	// 获取链接地址
 	hostPort := getHostPort(client)
@@ -126,19 +132,25 @@ func proxy(client net.Conn) {
 	// 判断存在地址链接
 	if hostPort != "" {
 		// 转发地址
-		ssh, err := GableClient.Dial("tcp", hostPort)
-		if err != nil {
-			log.Fatalf("代理数据请求错误信息: %v", err)
-			return
+		ssh, _ := GableClient.Dial("tcp", hostPort)
+
+		if ssh != nil {
+			// 兜底关闭
+			defer ssh.Close()
+
+			// 响应客户端连接成功
+			client.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+
+			//进行转发
+			go io.Copy(ssh, client)
+			io.Copy(client, ssh)
 		}
-		// 兜底关闭
-		defer ssh.Close()
+	}
+}
 
-		// 响应客户端连接成功
-		client.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-
-		//进行转发
-		go io.Copy(ssh, client)
-		io.Copy(client, ssh)
+// 错误信息hook
+func errorHook() {
+	if err := recover(); err != nil {
+		fmt.Printf("错误信息: %v\n", err)
 	}
 }
